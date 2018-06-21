@@ -710,7 +710,7 @@ class Command(object):
                             help='Remove without requesting a confirmation')
         parser.add_argument("-o", "--outdated", default=False, action="store_true",
                             help="Remove only outdated from recipe packages")
-        parser.add_argument('-p', '--packages', nargs="*", action=Extender,
+        parser.add_argument('-p', '--packages', nargs=1, action=Extender,
                             help="Select package to remove specifying the package ID")
         parser.add_argument('-q', '--query', default=None, action=OnceArgument, help=_QUERY_HELP)
         parser.add_argument('-r', '--remote', action=OnceArgument,
@@ -737,7 +737,7 @@ class Command(object):
             return
         else:
             if not args.pattern_or_reference:
-                raise ConanException('Please specify a pattern to be removed ("*" for all)')
+                raise ConanException('Please specify a pattern or reference to be removed')
 
         return self._conan.remove(pattern=reference or args.pattern_or_reference, query=args.query,
                                   packages=args.packages, builds=args.builds, src=args.src,
