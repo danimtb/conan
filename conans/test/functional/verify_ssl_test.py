@@ -54,3 +54,34 @@ class VerifySSLTest(unittest.TestCase):
         self.client.run("remote add myremote https://localhost False")
         self.client.run("search op* -r myremote")
 
+
+    def dependency_test(self):
+        conanfile = """
+from conans import ConanFile
+
+class MyConan(ConanFile):
+    name = "{name}"
+    version = "{version}"
+    {requires}
+    """
+        client = TestClient()
+        files = {
+            "potato.py": conanfile.format(name="potato", version="1.0.0", requires=""),
+            "carrot.py": conanfile.format(name="carrot", version="1.0.0",
+                                          requires="requires = 'potato/1.0.0@dani/test'"),
+            "foo.py": conanfile.format(name="foo", version="1.0.0",
+                                       requires="requires = 'potato/1.0.0@dani/test', 'carrot/1.0.0@dani/test'")
+        }
+        client.save(files)
+        client.run("create potato.py dani/test")
+        client.run("create carrot.py dani/test")
+        print("carrot", client.out)
+        client.run("create foo.py dani/test")
+        files = {
+            "potato.py": conanfile.format(name="potato", version="2.0.0", requires=""),
+            "foo.py": conanfile.format(name="foo", version="1.0.0",
+                                       requires="requires = 'potato/2.0.0@dani/test', 'carrot/1.0.0@dani/test'")
+        }
+        client.save(files)
+        client.run("create potato.py dani/test")
+        client.run("create foo.py dani/test")
