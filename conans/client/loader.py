@@ -111,7 +111,12 @@ class ConanFileLoader(object):
 
             if consumer:
                 conanfile.develop = True
-                processed_profile._user_options[conanfile.name].update(processed_profile._user_options["*"])
+                # Apply general scope values to consumer conanfile if it declares such option
+                for key in processed_profile._user_options["*"].keys():
+                    if conanfile.options.values.as_list():
+                        if key in [key for key in conanfile.options.values.as_list()[0]]:
+                            processed_profile._user_options[conanfile.name].add_option(
+                                key, getattr(processed_profile._user_options["*"], key))
                 processed_profile._user_options.descope_options(conanfile.name)
                 conanfile.options.initialize_upstream(processed_profile._user_options, local=local)
                 processed_profile._user_options.clear_unscoped_options()
