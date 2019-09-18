@@ -379,3 +379,39 @@ class GraphLockPythonRequiresTest(unittest.TestCase):
         client.run("export-pkg . Pkg/0.1@user/channel --install-folder=.  --lockfile")
         self.assertIn("Pkg/0.1@user/channel: CONFIGURE VAR=42", client.out)
         self._check_lock("Pkg/0.1@user/channel#332c2615c2ff9f78fc40682e733e5aa5")
+
+
+class GraphLockuserTest(unittest.TestCase):
+
+    def setUp(self):
+        self.client = TestClient()
+        self.client.run("config set general.revisions_enabled=1")
+        #self.client.run("config set general.default_package_id_mode=recipe_revision_mode")
+        self.client.run("remote add conan-center https://conan.bintray.com")
+
+        consumer_ref = ConanFileReference("test4", "0.1", None, None, None)
+        consumer = GenConanfile().with_name(consumer_ref.name).with_version(consumer_ref.version)
+
+        # for num in ["1", "2", "3"]:
+        #     ref = ConanFileReference("test%s" % num, "0.1", None, None, None)
+        #     consumer = consumer.with_requirement(ref)
+        #     conanfile = GenConanfile().with_name(ref.name).with_version(ref.version)
+        #     if num == "1":
+        #         conanfile.with_build_require_plain("test2/0.1").with_build_require_plain("test3/0.1")
+        #     if num == "3":
+        #         conanfile = conanfile.with_requirement_plain("test2/0.1")
+        #     self.client.save({"conanfile%s.py" % num: conanfile})
+        #     self.client.run("export conanfile%s.py" % num)
+        #
+        # for num in ["1", "2", "3"]:
+        #     self.client.run("create conanfile%s.py --build missing" % num)
+
+        self.client.save({"conanfile.py": consumer})
+        self.client.run("export conanfile.py")
+        print(self.client.cache.package_layout(consumer_ref).load_metadata())
+        self.client.run("graph lock conanfile.py")
+        print(load(os.path.join(self.client.current_folder, "conan.lock")))
+
+    def user_test(self):
+        self.client.run("graph build-order conan.lock")
+        print(self.client.out)

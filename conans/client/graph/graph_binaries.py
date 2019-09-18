@@ -99,7 +99,9 @@ class GraphBinariesAnalyzer(object):
 
             if self._cache.config.revisions_enabled:
                 metadata = self._cache.package_layout(pref.ref).load_metadata()
-                rec_rev = metadata.packages[pref.id].recipe_revision
+                #rec_rev = metadata.packages[pref.id].recipe_revision
+                rec_rev = metadata.recipe.revision
+                pref.ref.revision = rec_rev
                 if rec_rev and rec_rev != node.ref.revision:
                     output.warn("The package {} doesn't belong "
                                 "to the installed recipe revision, removing folder".format(pref))
@@ -109,7 +111,7 @@ class GraphBinariesAnalyzer(object):
         if not remote:
             # If the remote_name is not given, follow the binary remote, or
             # the recipe remote
-            # If it is defined it won't iterate (might change in conan2.0)
+            # If it is defined it won't iterate (might change in conan 2.0)
             metadata = self._cache.package_layout(pref.ref).load_metadata()
             remote_name = metadata.packages[pref.id].remote or metadata.recipe.remote
             remote = remotes.get(remote_name)

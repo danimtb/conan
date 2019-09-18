@@ -180,6 +180,7 @@ class ClientV2Router(ClientCommonRouter):
 
     def package_latest(self, pref):
         """Get the latest of a package"""
+        print(pref.full_str(), pref.ref.revision)
         assert pref.ref.revision is not None, "Cannot get the latest package without RREV"
         return self.base_url + _format_pref(routes.package_revision_latest, pref)
 

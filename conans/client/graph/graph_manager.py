@@ -182,7 +182,7 @@ class GraphManager(object):
                                       graph_lock=graph_lock)
 
         # THIS IS NECESSARY to store dependencies options in profile, for consumer
-        # FIXME: This is a hack. Might dissapear if graph for local commands is always recomputed
+        # FIXME: This is a hack. Might disappear if graph for local commands is always recomputed
         graph_info.options = root_node.conanfile.options.values
         if ref:
             graph_info.root = ref
