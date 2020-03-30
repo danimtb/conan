@@ -7,10 +7,9 @@ from conans.model import Generator
 
 class CMakeFindPackageMultiGenerator(Generator):
     config_xxx_template = """
-
 # Requires CMake > 3.0
 if(${{CMAKE_VERSION}} VERSION_LESS "3.0")
-   message(FATAL_ERROR "The 'cmake_find_package_multi' generator only works with CMake > 3.0" )
+    message(FATAL_ERROR "The 'cmake_find_package_multi' generator only works with CMake > 3.0" )
 endif()
 
 include(${{CMAKE_CURRENT_LIST_DIR}}/{name}Targets.cmake)
@@ -29,9 +28,8 @@ get_filename_component(_DIR "${{CMAKE_CURRENT_LIST_FILE}}" PATH)
 file(GLOB CONFIG_FILES "${{_DIR}}/{name}Target-*.cmake")
 
 foreach(f ${{CONFIG_FILES}})
-  include(${{f}})
+    include(${{f}})
 endforeach()
-    
 """
 
     target_properties = """
@@ -60,32 +58,30 @@ set_property(TARGET {name}::{name}
                  $<$<CONFIG:RelWithDebInfo>:${{{name}_COMPILE_OPTIONS_RELWITHDEBINFO_LIST}}>
                  $<$<CONFIG:MinSizeRel>:${{{name}_COMPILE_OPTIONS_MINSIZEREL_LIST}}>
                  $<$<CONFIG:Debug>:${{{name}_COMPILE_OPTIONS_DEBUG_LIST}}>) 
-    """
+"""
 
 # https://gitlab.kitware.com/cmake/cmake/blob/master/Modules/BasicConfigVersion-SameMajorVersion.cmake.in
     version_template = """
 set(PACKAGE_VERSION "{version}")
 
 if(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION)
-  set(PACKAGE_VERSION_COMPATIBLE FALSE)
-else()
-
-  if("{version}" MATCHES "^([0-9]+)\\\\.")
-    set(CVF_VERSION_MAJOR "${{CMAKE_MATCH_1}}")
-  else()
-    set(CVF_VERSION_MAJOR "{version}")
-  endif()
-
-  if(PACKAGE_FIND_VERSION_MAJOR STREQUAL CVF_VERSION_MAJOR)
-    set(PACKAGE_VERSION_COMPATIBLE TRUE)
-  else()
     set(PACKAGE_VERSION_COMPATIBLE FALSE)
-  endif()
+else()
+    if("{version}" MATCHES "^([0-9]+)\\\\.")
+        set(CVF_VERSION_MAJOR "${{CMAKE_MATCH_1}}")
+    else()
+        set(CVF_VERSION_MAJOR "{version}")
+    endif()
 
-  if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)
-      set(PACKAGE_VERSION_EXACT TRUE)
-  endif()
+    if(PACKAGE_FIND_VERSION_MAJOR STREQUAL CVF_VERSION_MAJOR)
+        set(PACKAGE_VERSION_COMPATIBLE TRUE)
+    else()
+        set(PACKAGE_VERSION_COMPATIBLE FALSE)
+    endif()
 
+    if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)
+        set(PACKAGE_VERSION_EXACT TRUE)
+    endif()
 endif()
 """
 
