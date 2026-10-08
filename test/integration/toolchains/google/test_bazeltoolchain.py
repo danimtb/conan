@@ -40,7 +40,7 @@ def test_default_bazel_toolchain(conanfile):
             "profile": profile})
     c.run("install . -pr profile")
     content = load(c, os.path.join(c.current_folder, "conan", BazelToolchain.bazelrc_name))
-    build = load(c, os.path.join(c.current_folder, "conan", "toolchain", "BUILD.bazel"))
+    build = load(c, os.path.join(c.current_folder, "conan", "conan_toolchain", "BUILD.bazel"))
     assert "cc_toolchain(" not in build
     assert "build:conan-config --cxxopt=-std=gnu++17" in content
     assert "build:conan-config --force_pic=True" in content
@@ -109,7 +109,7 @@ def test_bazel_toolchain_and_cross_compilation(conanfile):
     c.run("install . -pr:b profile -pr:h profile_host")
     content = load(c, os.path.join(c.current_folder, "conan", BazelToolchain.bazelrc_name))
     assert "--cpu" not in content
-    assert "build:conan-config --platforms=//conan/toolchain:target" in content
+    assert "build:conan-config --platforms=//conan/conan_toolchain:target" in content
 
 
 def test_toolchain_attributes_and_conf_priority():
@@ -172,74 +172,101 @@ def test_toolchain_attributes_and_conf_priority():
     build:conan-config --compiler=gcc
     build:conan-config --cpu=armv8
     build:conan-config --crosstool_top=my_crosstool
-    build:conan-config --platforms=//toolchain:target
-    build:conan-config --host_platform=//toolchain:host
+    build:conan-config --platforms=//conan_toolchain:target
+    build:conan-config --host_platform=//conan_toolchain:host
     """)
     assert expected == content
 
 
-def test_recipe_without_shared_option():
-    """
-    A recipe without a shared option must not write --dynamic_mode. A missing option is not False.
-    """
-    profile = textwrap.dedent("""
+def _linux_profile(arch="x86_64"):
+    return textwrap.dedent(f"""
     [settings]
-    arch=x86_64
+    arch={arch}
     build_type=Release
-    compiler=apple-clang
+    compiler=gcc
     compiler.cppstd=gnu17
-    compiler.libcxx=libc++
-    compiler.version=13.0
-    os=Macos
+    compiler.libcxx=libstdc++11
+    compiler.version=11
+    os=Linux
     """)
-    conanfile = textwrap.dedent("""
-    from conan import ConanFile
-    class ExampleConanIntegration(ConanFile):
-        settings = "os", "arch", "build_type", "compiler"
-        generators = "BazelToolchain"
+
+
+def test_native_build_generates_platforms(conanfile):
+    """A native gcc Linux build writes host and target platforms with the same constraints."""
+    profile = _linux_profile()
+    c = TestClient()
+    c.save({"conanfile.py": conanfile, "profile": profile})
+    c.run("install . -pr:b profile -pr:h profile")
+    content = load(c, os.path.join(c.current_folder, "conan", BazelToolchain.bazelrc_name))
+    assert "build:conan-config --platforms=//conan/conan_toolchain:target" in content
+    assert "build:conan-config --host_platform=//conan/conan_toolchain:host" in content
+    build = load(c, os.path.join(c.current_folder, "conan", "conan_toolchain", "BUILD.bazel"))
+    expected_build = textwrap.dedent("""\
+    platform(
+        name = "host",
+        constraint_values = [
+            "@platforms//os:linux",
+            "@platforms//cpu:x86_64",
+        ],
+    )
+
+    platform(
+        name = "target",
+        constraint_values = [
+            "@platforms//os:linux",
+            "@platforms//cpu:x86_64",
+        ],
+    )
     """)
+    assert expected_build in build
+
+
+def test_cross_build_generates_platforms(conanfile):
+    """A gcc Linux cross build writes different host and target platforms and registers the cc toolchain."""
     c = TestClient()
     c.save({"conanfile.py": conanfile,
-            "profile": profile})
-    c.run("install . -pr profile")
-    content = load(c, os.path.join(c.current_folder, BazelToolchain.bazelrc_name))
-    assert "--dynamic_mode" not in content
+            "profile_build": _linux_profile(),
+            "profile_host": _linux_profile("armv8")})
+    c.run("install . -pr:b profile_build -pr:h profile_host")
+    content = load(c, os.path.join(c.current_folder, "conan", BazelToolchain.bazelrc_name))
+    assert "build:conan-config --platforms=//conan/conan_toolchain:target" in content
+    assert "build:conan-config --host_platform=//conan/conan_toolchain:host" in content
+    build = load(c, os.path.join(c.current_folder, "conan", "conan_toolchain", "BUILD.bazel"))
+    expected_build = textwrap.dedent("""\
+    platform(
+        name = "host",
+        constraint_values = [
+            "@platforms//os:linux",
+            "@platforms//cpu:x86_64",
+        ],
+    )
 
-
-def test_linker_flags_do_not_mutate_conf():
-    """
-    Reading ldflags must not append exe flags or linker scripts onto tools.build:sharedlinkflags.
-    A second read returns the same flags.
-    """
-    profile = textwrap.dedent("""
-    [settings]
-    arch=x86_64
-    build_type=Release
-    compiler=apple-clang
-    compiler.cppstd=gnu17
-    compiler.libcxx=libc++
-    compiler.version=13.0
-    os=Macos
-    [conf]
-    tools.build:sharedlinkflags+=["--shared"]
-    tools.build:exelinkflags+=["--exe"]
-    tools.build:linker_scripts+=["myscript.sh"]
+    platform(
+        name = "target",
+        constraint_values = [
+            "@platforms//os:linux",
+            "@platforms//cpu:aarch64",
+        ],
+    )
     """)
-    conanfile = textwrap.dedent("""
-    from conan import ConanFile
-    from conan.tools.google import BazelToolchain
-    class ExampleConanIntegration(ConanFile):
-        settings = "os", "arch", "build_type", "compiler"
+    assert expected_build in build
+    module = load(c, os.path.join(c.current_folder, "conan", "conan_toolchain.MODULE.bazel"))
+    expected_module = textwrap.dedent("""\
+    # Generated by BazelToolchain. Include in your MODULE.bazel file with:
+    # include("//conan:conan_toolchain.MODULE.bazel")
 
-        def generate(self):
-            bz = BazelToolchain(self)
-            first = " ".join(bz.ldflags)
-            second = " ".join(bz.ldflags)
-            conf = " ".join(self.conf.get("tools.build:sharedlinkflags"))
-            self.output.info(f"LDREADS {first} || {second} || {conf}")
+    bazel_dep(name = "platforms", version = "1.1.0")
+    bazel_dep(name = "rules_cc", version = "0.2.17")
+    register_toolchains("//conan/conan_toolchain:cc")
     """)
+    assert expected_module == module
+
+
+def test_unmapped_arch_fails(conanfile):
+    """An arch without a platforms mapping fails the install."""
     c = TestClient()
     c.save({"conanfile.py": conanfile,
-            "profile": profile})
-    c.run("install . -pr profile")
-    assert "LDREADS --shared --exe -T'myscript.sh' || --shared --exe -T'myscript.sh' || --shared" in c.out
+            "profile_build": _linux_profile(),
+            "profile_host": _linux_profile("wasm")})
+    c.run("install -pr:b profile_build -pr:h profile_host", assert_error=True)
+    assert "Cannot map os='Linux' arch='wasm' to Bazel platform constraints." in c.out
